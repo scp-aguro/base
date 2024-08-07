@@ -1,1 +1,2 @@
-# base
+# github workflow
+- auto assign
