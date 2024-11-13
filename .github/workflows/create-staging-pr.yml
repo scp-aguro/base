@@ -1,33 +1,21 @@
 # .github/workflows/create-staging-pr.yml
 name: Create/Update Staging PR
 
-# devブランチへのPRが開かれたり閉じられたりした時にトリガーされる
 on:
   pull_request:
-    types: [opened, closed]
+    types: [closed]
     branches:
       - dev
 
 jobs:
   manage-staging-pr:
+    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
-    # PRの作成・更新に必要な権限を設定
     permissions:
       pull-requests: write
       contents: write
 
     steps:
-      # リポジトリのチェックアウト
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      # Node.jsのセットアップ
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '16'
-
-      # staging PRの作成または更新を行う
       - name: Create or Update Staging PR
         uses: actions/github-script@v6
         with:
@@ -47,100 +35,32 @@ jobs:
               return prs.data.find(pr => pr.title.startsWith('dev→staging'));
             }
             
-            // devブランチへのオープンなPRを取得する関数
-            async function getRelatedPRs() {
-              const prs = await github.rest.pulls.list({
-                owner,
-                repo,
-                state: 'open',
-                base: 'dev'
-              });
-              return prs.data.filter(pr => !pr.title.startsWith('dev→staging'));
-            }
+            // 現在のPRの情報を取得
+            const mergedPR = context.payload.pull_request;
             
-            // PR本文を生成する関数
-            async function createPRBody(relatedPRs) {
-              let body = '# Related PRs\n\n';
-              for (const pr of relatedPRs) {
-                body += `- [#${pr.number}](${pr.html_url}) ${pr.title}\n`;
-              }
-              return body;
-            }
+            // PR本文に追加する行を生成
+            const newPRLine = `- [#${mergedPR.number}](${mergedPR.html_url}) ${mergedPR.title}\n`;
             
-            // PRのタイトルを更新する関数（日付範囲を含める）
-            async function updatePRTitle(prNumber, relatedPRs) {
-              if (relatedPRs.length === 0) return;
-              
-              // 関連PRの最古と最新の日付を取得
-              const dates = relatedPRs.map(pr => new Date(pr.created_at));
-              const oldestDate = new Date(Math.min(...dates)).toISOString().split('T')[0];
-              const newestDate = new Date(Math.max(...dates)).toISOString().split('T')[0];
-              
-              const newTitle = `dev→staging ${oldestDate}-${newestDate}`;
-              
-              // PRのタイトルを更新
-              await github.rest.pulls.update({
-                owner,
-                repo,
-                pull_number: prNumber,
-                title: newTitle
-              });
-            }
-            
-            // メイン処理
             const existingPR = await findStagingPR();
-            const relatedPRs = await getRelatedPRs();
             
-            if (!existingPR && relatedPRs.length > 0) {
+            if (!existingPR) {
               // staging PRが存在しない場合、新規作成
-              const prBody = await createPRBody(relatedPRs);
-              const newPR = await github.rest.pulls.create({
+              const prBody = '# Merged PRs\n\n' + newPRLine;
+              await github.rest.pulls.create({
                 owner,
                 repo,
-                title: 'dev→staging',
+                title: `dev→staging ${mergedPR.merged_at.split('T')[0]}`,
                 head: 'dev',
                 base: 'staging',
                 body: prBody
               });
-              
-              await updatePRTitle(newPR.data.number, relatedPRs);
-            } else if (existingPR) {
-              // staging PRが存在する場合、更新
-              const prBody = await createPRBody(relatedPRs);
+            } else {
+              // staging PRが存在する場合、PRの情報を追記
+              const updatedBody = existingPR.body + newPRLine;
               await github.rest.pulls.update({
                 owner,
                 repo,
                 pull_number: existingPR.number,
-                body: prBody
-              });
-              
-              await updatePRTitle(existingPR.number, relatedPRs);
-            }
-
-      # PRがマージされずにクローズされた場合の処理
-      - name: Handle PR Closure
-        if: github.event.action == 'closed' && !github.event.pull_request.merged
-        uses: actions/github-script@v6
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const { owner, repo } = context.repo;
-            
-            // クローズされたPRをstaging PRから削除
-            const stagingPR = await findStagingPR();
-            
-            if (stagingPR) {
-              // PR本文から該当のPRの行を削除
-              const body = stagingPR.body.replace(
-                `- [#${context.payload.pull_request.number}](${context.payload.pull_request.html_url}) ${context.payload.pull_request.title}\n`,
-                ''
-              );
-              
-              // staging PRを更新
-              await github.rest.pulls.update({
-                owner,
-                repo,
-                pull_number: stagingPR.number,
-                body
+                body: updatedBody
               });
             }
