@@ -1,25 +1,18 @@
-
-name: Assign auto
-
 on:
   pull_request:
-    types: opened # プルリクを作成したタイミングだけで動かす
+    types: [ opened, unassigned ]
 
 jobs:
   assign:
-    name: Set assignees
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+
     steps:
-      - name: Set assignees
+      - run: cat $GITHUB_EVENT_PATH
+      - run: gh pr edit $NUMBER --add-assignee $ASSIGNEE
         env:
-          ASSIGNEES: "${{ github.actor }}" # 変えたければここを変える
-        run: |
-          assignee_count=$(cat ${{ github.event_path }} | jq '.pull_request.assignees | length')
-          if [[ 0 == $assignee_count ]]; then
-            assignees=$(echo "\"${ASSIGNEES// /}\"" | jq 'split(",")')
-            curl -X POST \
-                 -H "Content-Type: application/json" \
-                 -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-                 -d "{ \"assignees\": $assignees }" \
-                 https://api.github.com/repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/assignees
-          fi
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.pull_request.number }}
+          ASSIGNEE: ${{ github.event.pull_request.user.login }}
+        if: ${{ toJSON(github.event.pull_request.assignees) == '[]' }}

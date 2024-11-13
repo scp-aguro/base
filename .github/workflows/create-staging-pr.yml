@@ -1,0 +1,66 @@
+# .github/workflows/create-staging-pr.yml
+name: Create/Update Staging PR
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - dev
+
+jobs:
+  manage-staging-pr:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: write
+
+    steps:
+      - name: Create or Update Staging PR
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+            
+            // dev→stagingのPRを検索する関数
+            async function findStagingPR() {
+              const prs = await github.rest.pulls.list({
+                owner,
+                repo,
+                state: 'open',
+                base: 'staging',
+                head: 'dev'
+              });
+              return prs.data.find(pr => pr.title.startsWith('dev→staging'));
+            }
+            
+            // 現在のPRの情報を取得
+            const mergedPR = context.payload.pull_request;
+            
+            // PR本文に追加する行を生成
+            const newPRLine = `- [#${mergedPR.number}](${mergedPR.html_url}) ${mergedPR.title}\n`;
+            
+            const existingPR = await findStagingPR();
+            
+            if (!existingPR) {
+              // staging PRが存在しない場合、新規作成
+              const prBody = '# Merged PRs\n\n' + newPRLine;
+              await github.rest.pulls.create({
+                owner,
+                repo,
+                title: `dev→staging ${mergedPR.merged_at.split('T')[0]}`,
+                head: 'dev',
+                base: 'staging',
+                body: prBody
+              });
+            } else {
+              // staging PRが存在する場合、PRの情報を追記
+              const updatedBody = existingPR.body + newPRLine;
+              await github.rest.pulls.update({
+                owner,
+                repo,
+                pull_number: existingPR.number,
+                body: updatedBody
+              });
+            }
