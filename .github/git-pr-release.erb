@@ -1,0 +1,4 @@
+dev->staging <%= Time.now.strftime('%Y-%m-%d %H:%M') %>
+<% pull_requests.each do |pr| -%>
+- #<%= pr.number %> <%= pr.mention %>
+<% end -%>
