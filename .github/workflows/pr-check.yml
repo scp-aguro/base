@@ -13,8 +13,6 @@ jobs:
       # リポジトリのコードを取得する（履歴も含めて取得）
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # 全履歴を取得
 
       # 変更ファイル数の確認
       - name: Check number of changed files
@@ -23,6 +21,7 @@ jobs:
           echo "変更されたファイル数: $FILES_CHANGED"
           if [ $FILES_CHANGED -gt 20 ]; then
             echo "⚠️ 警告: 変更ファイルが20個を超えています。PRを分割することを検討してください。"
+            exit 1
           fi
 
       # Typoをチェックする
