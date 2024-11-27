@@ -1,0 +1,28 @@
+name: Pull Request Checks
+
+on:
+  pull_request:
+    types: opened
+    branches: main
+
+jobs:
+  pr-checks:
+    runs-on: ubuntu-latest
+
+    steps:
+      # リポジトリのコードを取得する
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 変更ファイル数の確認
+      - name: Check number of changed files
+        run: |
+          FILES_CHANGED=$(git diff --name-only origin/${{ github.base_ref }} HEAD | wc -l)
+          echo "変更されたファイル数: $FILES_CHANGED"
+          if [ $FILES_CHANGED -gt 20 ]; then
+            echo "⚠️ 警告: 変更ファイルが20個を超えています。PRを分割することを検討してください。"
+          fi
+
+      # Typoをチェックする
+      - name: Run Typos
+        uses: crate-ci/typos@master
