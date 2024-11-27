@@ -10,9 +10,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # リポジトリのコードを取得する
+      # リポジトリのコードを取得する（履歴も含めて取得）
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 全履歴を取得
 
       # 変更ファイル数の確認
       - name: Check number of changed files
