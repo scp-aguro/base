@@ -1,3 +1,5 @@
+![example workflow](https://github.com/scp-aguro/base/actions/workflows/assign_auto.yml/badge.svg)
+
 # github actions
 ## auto assign
   - PullRequestしたら勝手にasigneeをつけてくれる
