@@ -1,6 +1,6 @@
 on:
   pull_request:
-    types: [ opened, unassigned ]
+    types: [ reopened, opened, unassigned ]
 
 jobs:
   assign:
